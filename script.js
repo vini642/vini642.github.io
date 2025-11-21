@@ -1,3 +1,5 @@
 function clik() {
-  window.location.assign('https://www.youtube.com/watch?v=4MQMvJg8pNc')
+  alert("this is my website!");
+  alert("its just made for tests and practices for HTML and JavaScript and abit of CSS");
+  alert("hope you enjoy!");
 }

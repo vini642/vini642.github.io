@@ -1,3 +1,3 @@
 function clik() {
-  window.location.href = 'https://www.youtube.com/watch?v=4MQMvJg8pNc'
+  window.location.assign('https://www.youtube.com/watch?v=4MQMvJg8pNc')
 }

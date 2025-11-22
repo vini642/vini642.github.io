@@ -4,5 +4,5 @@ function clik() {
   alert("hope you enjoy!");
 }
 function test() {
-  window.location.assign(https://vini642.github.io/about.html)
+  window.location.assign("https://vini642.github.io/about.html")
 }

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokedex Scanner</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+        /* Custom Pokedex Styling for the display box */
+        .pokedex-card {
+            background-color: #ffffff;
+            border: 4px solid #cc0000; /* Pokémon Red border */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+        /* Custom button styling */
+        .scan-button {
+            background-color: #cc0000; /* Red */
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .scan-button:hover {
+            background-color: #a00000;
+        }
+        .scan-button:active {
+            transform: scale(0.98);
+        }
+        /* Status color utility */
+        .type-color {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            margin-right: 4px;
+        }
+        /* Ensure aspect ratio utility is applied correctly for video container */
+        .aspect-square {
+            aspect-ratio: 1 / 1;
+        }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .sm\:aspect-video {
+                aspect-ratio: 16 / 9;
+            }
+        }
+        /* FIX: Explicitly ensure the video element fills its container */
+        #cameraFeed {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center min-h-screen bg-gray-100">
+
+    <header class="w-full max-w-lg mb-6">
+        <h1 class="text-4xl font-extrabold text-center text-red-600">
+            Pokedex Scanner
+        </h1>
+        <p class="text-center text-sm text-gray-500 mt-1">
+            Capture a Pokémon (plush, drawing, image) to get its Pokedex data!
+        </p>
+    </header>
+
+    <div class="w-full max-w-lg flex flex-col items-center space-y-4">
+        
+        <!-- Camera Viewport and Capture Button -->
+        <div class="w-full relative bg-gray-900 rounded-xl overflow-hidden shadow-lg aspect-square sm:aspect-video">
+            <video id="cameraFeed" autoplay playsinline style="transform: scaleX(-1);"></video>
+            <canvas id="captureCanvas" class="hidden"></canvas>
+            
+            <div id="statusMessage" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 text-white text-lg font-bold p-4 hidden">
+                Initializing Camera...
+            </div>
+            
+            <button id="captureButton" disabled class="scan-button w-20 h-20 rounded-full flex items-center justify-center absolute bottom-4 left-1/2 transform -translate-x-1/2 ring-4 ring-white shadow-2xl disabled:bg-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A.5.5 0 0011.38 3H8.62a.5.5 0 00-.353.146L7.293 4.707A1 1 0 016.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Pokedex Result Display -->
+        <div id="pokedexResult" class="pokedex-card w-full p-4 md:p-6 rounded-xl border-4 mt-6">
+            <h2 class="text-2xl font-bold mb-2 text-gray-800">Pokedex Entry</h2>
+            
+            <div id="pokeId" class="text-sm font-mono absolute top-2 right-4 bg-red-600 text-white px-3 py-1 rounded-bl-lg rounded-tr-md">ID: ???</div>
+
+            <div class="space-y-3">
+                <p class="text-4xl font-extrabold text-red-700" id="pokeName">---</p>
+                <div id="pokeTypes" class="flex flex-wrap items-center">
+                    <span class="text-gray-400 font-semibold mr-2">Type:</span>
+                    <span class="type-color" style="background-color: #ddd; color: #333;">...</span>
+                </div>
+                <p id="pokeDescription" class="text-gray-600 italic">
+                    Press the red button to scan an object and reveal its secrets.
+                </p>
+            </div>
+        </div>
+
+        <!-- Error/Loading Modal (Customized for no alerts) -->
+        <div id="loadingIndicator" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-2xl flex flex-col items-center">
+                <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p id="loadingMessage" class="mt-2 text-gray-700 font-semibold">Scanning...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONSTANTS AND INITIALIZATION ---
+        const video = document.getElementById('cameraFeed');
+        const canvas = document.getElementById('captureCanvas');
+        const captureButton = document.getElementById('captureButton');
+        const statusMessage = document.getElementById('statusMessage');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const loadingMessage = document.getElementById('loadingMessage');
+        
+        // Pokedex Display Elements
+        const pokeName = document.getElementById('pokeName');
+        const pokeId = document.getElementById('pokeId');
+        const pokeTypes = document.getElementById('pokeTypes');
+        const pokeDescription = document.getElementById('pokeDescription');
+
+        const API_KEY = ""; // Gemini API key is managed by the environment.
+        const MODEL = 'gemini-2.5-flash-preview-09-2025';
+
+        // Custom function to map types to aesthetically pleasing colors
+        const TYPE_COLORS = {
+            'Normal': { bg: '#A8A878', text: '#333' },
+            'Fire': { bg: '#F08030', text: '#FFF' },
+            'Water': { bg: '#6890F0', text: '#FFF' },
+            'Grass': { bg: '#78C850', text: '#FFF' },
+            'Electric': { bg: '#F8D030', text: '#333' },
+            'Ice': { bg: '#98D8D8', text: '#333' },
+            'Fighting': { bg: '#C03028', text: '#FFF' },
+            'Poison': { bg: '#A040A0', text: '#FFF' },
+            'Ground': { bg: '#E0C068', text: '#333' },
+            'Flying': { bg: '#A890F0', text: '#333' },
+            'Psychic': { bg: '#F85888', text: '#FFF' },
+            'Bug': { bg: '#A8B820', text: '#FFF' },
+            'Rock': { bg: '#B8A038', text: '#FFF' },
+            'Ghost': { bg: '#705898', text: '#FFF' },
+            'Dragon': { bg: '#7038F8', text: '#FFF' },
+            'Steel': { bg: '#B8B8D0', text: '#333' },
+            'Dark': { bg: '#705848', text: '#FFF' },
+            'Fairy': { bg: '#EE99AC', text: '#333' },
+            'Unidentified Creature': { bg: '#555555', text: '#FFF' },
+            'None': { bg: '#DDDDDD', text: '#333' },
+            '???': { bg: '#333333', text: '#FFF' }
+        };
+
+        // --- CAMERA AND IMAGE CAPTURE ---
+
+        /**
+         * Initializes the camera feed.
+         */
+        async function initCamera() {
+            statusMessage.textContent = "Initializing Camera...";
+            statusMessage.classList.remove('hidden');
+            try {
+                // Request access to the user's camera (video only)
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment' // Prefer back camera on mobile
+                    }
+                });
+                video.srcObject = stream;
+
+                // Wait for the video to load metadata before setting up the canvas
+                video.onloadedmetadata = () => {
+                    // Set canvas dimensions to match video stream dimensions
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    video.play();
+                    statusMessage.classList.add('hidden');
+                    captureButton.disabled = false;
+                    captureButton.onclick = handleCapture;
+                };
+
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+                
+                let errorMessage = "Camera access failed. Ensure you have granted permissions.";
+                
+                // Add more specific feedback if the error is likely due to the secure context issue
+                if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                    errorMessage += " CRITICAL: Camera access requires a SECURE CONTEXT (HTTPS or localhost). Your browser is likely blocking the camera.";
+                } else if (error.name === "NotAllowedError") {
+                    errorMessage += " You denied camera permission or it's blocked by your system settings.";
+                } else if (error.name === "NotFoundError") {
+                    errorMessage += " No camera device found.";
+                }
+
+                statusMessage.textContent = errorMessage;
+                statusMessage.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Captures the current frame from the video feed to a canvas and converts it to Base64.
+         * @returns {string} Base64 encoded JPEG data.
+         */
+        function captureFrame() {
+            const context = canvas.getContext('2d');
+            // Draw the current video frame onto the canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Convert the canvas content to a Base64 string (JPEG format for better compression)
+            return canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        }
+
+        /**
+         * Converts a JSON object to a structured string representation for display.
+         * @param {Object} data - The parsed JSON data from the LLM.
+         */
+        function renderPokedexEntry(data) {
+            const name = data.name || '???';
+            const id = data.id || '???';
+            const type1 = data.type1 || 'Unidentified Creature';
+            const type2 = data.type2 || 'None';
+            const description = data.description || 'The Pokedex could not retrieve an accurate description for this species.';
+            
+            pokeName.textContent = name.toUpperCase();
+            pokeId.textContent = `ID: ${id}`;
+            pokeDescription.textContent = description;
+            
+            // Clear previous types
+            pokeTypes.innerHTML = '<span class="text-gray-400 font-semibold mr-2">Type:</span>';
+
+            // Function to create and append type badge
+            const createTypeBadge = (type) => {
+                const color = TYPE_COLORS[type] || TYPE_COLORS['Unidentified Creature'];
+                const span = document.createElement('span');
+                span.className = 'type-color rounded-lg px-2 py-0.5 shadow-md';
+                span.textContent = type;
+                span.style.backgroundColor = color.bg;
+                span.style.color = color.text;
+                pokeTypes.appendChild(span);
+            };
+
+            createTypeBadge(type1);
+            if (type2 && type2.toLowerCase() !== 'none' && type2 !== type1) {
+                createTypeBadge(type2);
+            }
+        }
+
+        // --- GEMINI API INTEGRATION ---
+
+        /**
+         * Calls the Gemini API to identify the Pokémon in the image.
+         * @param {string} base64Data - Base64 encoded image data.
+         */
+        async function identifyPokemon(base64Data) {
+            const systemPrompt = "You are a sophisticated Pokedex AI (version G-2.5-F). Your task is to analyze the user-provided image (which may be a drawing, a plush, or a photo of a screen) and accurately identify the primary Pokémon visible. Respond ONLY with a clean JSON object adhering to the provided schema. Do not include any preamble, markdown formatting outside of the JSON block, or conversational text. If you cannot identify a Pokémon, return the name as 'Unidentified Creature' and the ID as '???' (as a string). Be creative with the description if the source material (like a drawing) is unique.";
+
+            const userPrompt = "Analyze this image and identify the Pokémon. Provide its Pokedex details in the required JSON format. If no Pokémon is clearly visible, or if it is an unidentified creature, use the fallback values.";
+
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: userPrompt },
+                        {
+                            inlineData: {
+                                mimeType: "image/jpeg",
+                                data: base64Data
+                            }
+                        }
+                    ]
+                }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "name": { "type": "STRING", "description": "The common name of the identified Pokémon. Use title case." },
+                            "id": { "type": "STRING", "description": "The official Pokedex number (e.g., '025') or '???' if unidentified." },
+                            "type1": { "type": "STRING", "description": "The primary type of the Pokémon (e.g., 'Electric', 'Water')." },
+                            "type2": { "type": "STRING", "description": "The secondary type, or 'None' if single type." },
+                            "description": { "type": "STRING", "description": "A brief, 2-3 sentence description of the Pokémon." }
+                        },
+                        required: ["name", "id", "type1", "type2", "description"]
+                    }
+                }
+            };
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
+            const maxRetries = 3;
+            let attempt = 0;
+
+            while (attempt < maxRetries) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`API returned status ${response.status}: ${errorData.error.message}`);
+                    }
+
+                    const result = await response.json();
+                    const candidate = result.candidates?.[0];
+
+                    if (candidate && candidate.content?.parts?.[0]?.text) {
+                        const jsonText = candidate.content.parts[0].text;
+                        return JSON.parse(jsonText);
+                    } else {
+                        throw new Error("No structured content was returned by the model.");
+                    }
+
+                } catch (error) {
+                    console.error(`Attempt ${attempt + 1} failed:`, error.message);
+                    attempt++;
+                    if (attempt < maxRetries) {
+                        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff (1s, 2s, 4s)
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        throw new Error("Failed to communicate with the Pokedex AI after multiple retries.");
+                    }
+                }
+            }
+        }
+
+        // --- MAIN APPLICATION FLOW ---
+
+        async function handleCapture() {
+            captureButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+            loadingMessage.textContent = "Capturing Image...";
+
+            try {
+                const base64Data = captureFrame();
+
+                loadingMessage.textContent = "Analyzing image with Pokedex AI...";
+                
+                const pokedexData = await identifyPokemon(base64Data);
+
+                renderPokedexEntry(pokedexData);
+
+            } catch (error) {
+                console.error("Pokedex Scan Error:", error);
+                
+                // Render a default error message
+                renderPokedexEntry({
+                    name: 'Scan Error',
+                    id: '!!!',
+                    type1: 'Unidentified Creature',
+                    type2: 'None',
+                    description: `Scan failed: ${error.message}. If the camera is not visible, it's likely a browser permission or HTTPS requirement issue.`
+                });
+
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                captureButton.disabled = false;
+            }
+        }
+
+        // Initialize the camera when the window loads
+        window.onload = initCamera;
+
+    </script>
+</body>
+</html>
+

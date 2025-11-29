@@ -317,8 +317,11 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(`API returned status ${response.status}: ${errorData.error.message}`);
+                        // FIX: Log detailed status and response text for debugging
+                        console.error(`API Call failed (Attempt ${attempt + 1}). Status: ${response.status}`);
+                        const errorData = await response.json().catch(() => ({ error: { message: "Could not parse error JSON." } }));
+                        console.error("Error Detail:", errorData);
+                        throw new Error(`API returned status ${response.status}: ${errorData.error.message || 'Unknown error'}`);
                     }
 
                     const result = await response.json();
@@ -338,7 +341,8 @@
                         const delay = Math.pow(2, attempt) * 1000; // Exponential backoff (1s, 2s, 4s)
                         await new Promise(resolve => setTimeout(resolve, delay));
                     } else {
-                        throw new Error("Failed to communicate with the Pokedex AI after multiple retries.");
+                        // FIX: Return a more descriptive error message when all retries fail
+                        throw new Error("Failed to communicate with the Pokedex AI after multiple retries. Check console for API error details.");
                     }
                 }
             }
@@ -369,7 +373,7 @@
                     id: '!!!',
                     type1: 'Unidentified Creature',
                     type2: 'None',
-                    description: `Scan failed: ${error.message}. If the camera is not visible, it's likely a browser permission or HTTPS requirement issue.`
+                    description: `${error.message}`
                 });
 
             } finally {
@@ -384,4 +388,3 @@
     </script>
 </body>
 </html>
-
